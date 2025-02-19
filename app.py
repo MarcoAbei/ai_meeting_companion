@@ -1,15 +1,16 @@
 import streamlit as st
 import io
+import soundfile as sf
 from transformers import pipeline
 
-# Carica il modello di Automatic Speech Recognition (ASR) per trascrivere l'audio
-@st.cache(allow_output_mutation=True)
+# Usa st.cache_resource (nuova API di caching) per caricare i modelli
+
+@st.cache_resource
 def load_asr_model():
     asr = pipeline("automatic-speech-recognition", model="openai/whisper-small")
     return asr
 
-# Carica il modello per la generazione del riassunto
-@st.cache(allow_output_mutation=True)
+@st.cache_resource
 def load_summary_model():
     summarizer = pipeline("text2text-generation", model="google/flan-t5-small")
     return summarizer
@@ -29,7 +30,7 @@ def main():
     st.title("Riassunto Meeting & Estrazione Action Items")
     st.write("Carica un file audio della riunione o incolla il transcript per ottenere un riassunto ed i principali action items.")
 
-    # Sezione per l'upload del file audio
+    # Sezione per il caricamento del file audio
     uploaded_file = st.file_uploader("Carica file audio (WAV, MP3, M4A)", type=["wav", "mp3", "m4a"])
     
     transcript = ""
@@ -37,10 +38,13 @@ def main():
         st.audio(uploaded_file, format="audio/wav")
         with st.spinner("Trascrivendo l'audio..."):
             audio_bytes = uploaded_file.read()
-            transcript = asr_model(io.BytesIO(audio_bytes))["text"]
+            # Converti il file audio in un array numpy usando soundfile
+            data, samplerate = sf.read(io.BytesIO(audio_bytes))
+            transcript = asr_model(data)["text"]
         st.subheader("Trascrizione")
         st.write(transcript)
     else:
+        # Se non viene caricato un file, l'utente può inserire il testo manualmente
         transcript = st.text_area("O incolla qui il transcript della riunione", height=300)
 
     if st.button("Riassumi Riunione"):

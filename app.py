@@ -4,8 +4,7 @@ import soundfile as sf
 from transformers import pipeline
 import numpy as np
 
-# Usa st.cache_resource (nuova API di caching) per caricare i modelli
-
+# Usa st.cache_resource per caricare i modelli (nuove API di caching)
 @st.cache_resource
 def load_asr_model():
     asr = pipeline("automatic-speech-recognition", model="openai/whisper-small")
@@ -18,6 +17,16 @@ def load_summary_model():
 
 asr_model = load_asr_model()
 summary_model = load_summary_model()
+
+def transcribe_audio(data):
+    # Forza il chunking in segmenti di 30 secondi per evitare input troppo lunghi
+    result = asr_model(data, return_timestamps=True, chunk_length_s=30)
+    # Se il risultato contiene "chunks", unisci i testi per ottenere il transcript completo
+    if "chunks" in result:
+        transcript = " ".join(chunk["text"] for chunk in result["chunks"])
+    else:
+        transcript = result["text"]
+    return transcript
 
 def summarize_meeting(text):
     prompt = (
@@ -39,16 +48,15 @@ def main():
         st.audio(uploaded_file, format="audio/wav")
         with st.spinner("Trascrivendo l'audio..."):
             audio_bytes = uploaded_file.read()
-            # Leggi il file audio usando soundfile
+            # Leggi il file audio usando soundfile e convertilo in array numpy
             data, samplerate = sf.read(io.BytesIO(audio_bytes))
-            # Se l'audio è stereo (o multi-canale), convertilo in mono
+            # Se l'audio ha più canali (stereo), convertilo in mono
             if len(data.shape) > 1 and data.shape[1] > 1:
                 data = np.mean(data, axis=1)
-            transcript = asr_model(data)["text"]
+            transcript = transcribe_audio(data)
         st.subheader("Trascrizione")
         st.write(transcript)
     else:
-        # Se non viene caricato un file, l'utente può inserire il testo manualmente
         transcript = st.text_area("O incolla qui il transcript della riunione", height=300)
 
     if st.button("Riassumi Riunione"):

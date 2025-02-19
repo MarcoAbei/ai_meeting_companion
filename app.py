@@ -2,6 +2,7 @@ import streamlit as st
 import io
 import soundfile as sf
 from transformers import pipeline
+import numpy as np
 
 # Usa st.cache_resource (nuova API di caching) per caricare i modelli
 
@@ -38,8 +39,11 @@ def main():
         st.audio(uploaded_file, format="audio/wav")
         with st.spinner("Trascrivendo l'audio..."):
             audio_bytes = uploaded_file.read()
-            # Converti il file audio in un array numpy usando soundfile
+            # Leggi il file audio usando soundfile
             data, samplerate = sf.read(io.BytesIO(audio_bytes))
+            # Se l'audio è stereo (o multi-canale), convertilo in mono
+            if len(data.shape) > 1 and data.shape[1] > 1:
+                data = np.mean(data, axis=1)
             transcript = asr_model(data)["text"]
         st.subheader("Trascrizione")
         st.write(transcript)
